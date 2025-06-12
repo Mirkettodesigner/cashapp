@@ -4,5 +4,284 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cash Tracker</title>
-  ...
+  <style>
+    /* Stili generali */
+    body { font-family: sans-serif; margin: 0; background: #111; color: #fff; }
+    .container { display: flex; height: 100vh; }
+    .left, .right { padding: 1rem; }
+    .left { width: 30%; background: #1e1e1e; display: flex; flex-direction: column; justify-content: start; gap: 0.5rem; }
+    .right { width: 70%; display: flex; flex-direction: column; justify-content: start; }
+    
+    /* Stili per le categorie */
+    .categories { display: flex; flex-direction: column; gap: 0.5rem; }
+    .category { padding: 1rem; background: #333; border: none; cursor: pointer; border-radius: 4px; text-align: center; font-size: 1.2rem; }
+    .category.active { background: #555; }
+    
+    /* Stili per la tastiera */
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 1rem 0; }
+    .keypad input { grid-column: span 3; font-size: 2rem; text-align: right; padding: 0.5rem; background: #000; border: none; color: #fff; width: 100%; }
+    .key { padding: 1rem; background: #222; border: none; cursor: pointer; font-size: 1.5rem; border-radius: 4px; }
+    
+    /* Stili per le azioni */
+    .actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .actions button, .export { flex: 1; padding: 0.75rem 1rem; font-size: 1.1rem; border-radius: 4px; border: none; cursor: pointer; }
+    .cash { background: green; color: white; }
+    .pos { background: blue; color: white; }
+    .uscite { background: red; color: white; }
+    
+    /* Stili per lo storico */
+    #storico { margin-top: 1rem; overflow-y: auto; max-height: 200px; background: #222; padding: 0.5rem; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.3rem; text-align: left; border-bottom: 1px solid #444; font-size: 0.85rem; }
+    
+    /* Stili per il log */
+    #log { margin-top: 1rem; font-size: 0.9rem; color: #ccc; font-style: italic; }
+  </style>
+</head>
+<body>
+  <!-- Inizio contenitore principale -->
+  <div class="container">
+    <!-- Inizio sezione sinistra -->
+    <div class="left">
+      <div class="categories" id="categories"></div>
+    </div>
+    <!-- Fine sezione sinistra -->
+
+    <!-- Inizio sezione destra -->
+    <div class="right">
+      <!-- Inizio tastiera -->
+      <div class="keypad">
+        <input type="text" id="display" disabled />
+        <div class="key" data-value="1">1</div>
+        <div class="key" data-value="2">2</div>
+        <div class="key" data-value="3">3</div>
+        <div class="key" data-value="4">4</div>
+        <div class="key" data-value="5">5</div>
+        <div class="key" data-value="6">6</div>
+        <div class="key" data-value="7">7</div>
+        <div class="key" data-value="8">8</div>
+        <div class="key" data-value="9">9</div>
+        <div class="key" data-value=".">.</div>
+        <div class="key" data-value="0">0</div>
+        <div class="key" id="clear">C</div>
+      </div>
+      <!-- Fine tastiera -->
+
+      <!-- Inizio area note -->
+      <textarea id="note" placeholder="Note..." style="width:100%;padding:0.5rem;margin-bottom:1rem;"></textarea>
+      <!-- Fine area note -->
+
+      <!-- Inizio azioni -->
+      <div class="actions">
+        <button class="cash" onclick="register('CASH')">CASH</button>
+        <button class="pos" onclick="register('POS')">POS</button>
+        <button class="uscite" onclick="register('USCITE')">USCITE</button>
+      </div>
+      <!-- Fine azioni -->
+
+      <!-- Inizio pulsanti di esporta e sincronizzazione -->
+<div style="display: flex; gap: 1rem;">
+  <button class="export" onclick="exportCSV()">📁 Esporta CSV</button>
+  <button class="export" onclick="caricaDaGoogle()">📥 Carica da Google</button>
+</div>
+<!-- Fine pulsanti di esporta e sincronizzazione -->
+
+      <!-- Inizio risultato -->
+      <div id="result"></div>
+      <!-- Fine risultato -->
+
+      <!-- Inizio log -->
+      <div id="log"></div>
+      <!-- Fine log -->
+
+      <!-- Inizio storico -->
+      <div id="storico"></div>
+      <!-- Fine storico -->
+    </div>
+    <!-- Fine sezione destra -->
+  </div>
+  <!-- Fine contenitore principale -->
+
+  <!-- Inizio script JavaScript -->
+  <script>
+    // Inizio inizializzazione delle categorie
+try {
+  const categorie = ['GRAFICA', 'FOTOLAB', 'PANNELLI', 'TIPOGRAFIA', 'LASER'];
+  const container = document.getElementById('categories');
+  categorie.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.textContent = cat;
+    btn.className = 'category';
+    btn.onclick = () => {
+      document.querySelectorAll('.category').forEach(el => el.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    container.appendChild(btn);
+  });
+} catch (err) {
+  document.getElementById('log').innerText = 'Errore categorie: ' + err.message;
+}
+// Fine inizializzazione delle categorie
+
+    // Inizio gestione della tastiera
+    let currentInput = '';
+    document.querySelectorAll('.key').forEach(key => {
+      key.addEventListener('click', () => {
+        const value = key.getAttribute('data-value');
+        if (value) {
+          currentInput += value;
+          document.getElementById('display').value = currentInput;
+        } else if (key.id === 'clear') {
+          currentInput = '';
+          document.getElementById('display').value = '';
+        }
+      });
+    });
+    // Fine gestione della tastiera
+
+    // Inizio funzione di registrazione
+    function register(type) {
+      const amount = parseFloat(currentInput);
+      const note = document.getElementById('note').value;
+      const resultBox = document.getElementById('result');
+      const categoryBtn = document.querySelector('.category.active');
+
+      if (!categoryBtn) {
+        resultBox.innerText = 'Errore: Seleziona una categoria.';
+        return;
+      }
+
+      const category = categoryBtn.textContent;
+
+      if (isNaN(amount)) {
+        resultBox.innerText = 'Errore: Inserire un importo valido.';
+        return;
+      }
+
+      const now = new Date();
+      const data = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth()+1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+      const movimento = {
+        data,
+        importo: parseFloat(amount).toFixed(2),
+        categoria: category,
+        note,
+        tipo: type,
+        sync: false
+      };
+
+      const storico = JSON.parse(localStorage.getItem('movimenti') || '[]');
+      storico.push(movimento);
+      localStorage.setItem('movimenti', JSON.stringify(storico));
+
+      currentInput = '';
+      document.getElementById('display').value = '';
+      document.getElementById('note').value = '';
+      document.querySelectorAll('.category').forEach(el => el.classList.remove('active'));
+
+      resultBox.innerText = `Registrato: €${movimento.importo} - ${type} - ${category}`;
+
+      // Nuova riga: sincronizza subito
+      syncConSheet();
+    }
+    // Fine funzione di registrazione
+
+    // Inizio funzione di sincronizzazione con Google Sheet
+    function syncConSheet() {
+      const sheetUrl = 'https://script.google.com/macros/s/AKfycbx-88D_E0_ZZszE3nAwFAcOtBC9lV0Bwap1MSTp1FIzTn_do7LJKlXzlsSLEv1LNO1P/exec';
+      const movimenti = JSON.parse(localStorage.getItem('movimenti') || '[]');
+      const daSincronizzare = movimenti.filter(m => !m.sync);
+      const logBox = document.getElementById('log');
+      if (daSincronizzare.length === 0) {
+        document.getElementById('result').innerText = 'Nessun movimento da sincronizzare.';
+        logBox.innerText = '';
+        return;
+      }
+      let count = 0;
+      daSincronizzare.forEach((m, i) => {
+        const formData = new FormData();
+        formData.append("data", m.data);
+        formData.append("importo", parseFloat(m.importo).toFixed(2));
+        formData.append("categoria", m.categoria);
+        formData.append("tipo", m.tipo);
+        formData.append("note", m.note);
+        fetch(sheetUrl, {
+          method: 'POST',
+          body: formData
+        }).then(resp => {
+          if (!resp.ok) throw new Error('HTTP error ' + resp.status);
+          m.sync = true;
+          count++;
+          if (count === daSincronizzare.length) {
+            localStorage.setItem('movimenti', JSON.stringify(movimenti));
+            document.getElementById('result').innerText = `${count} movimento/i sincronizzato/i con Google Sheet.`;
+            logBox.innerText = 'Tutti i movimenti sono stati sincronizzati con successo.';
+          }
+        }).catch((err) => {
+          document.getElementById('result').innerText = 'Errore di sincronizzazione.';
+          logBox.innerText = `Errore: ${err.message}`;
+        });
+      });
+    }
+    // Fine funzione di sincronizzazione con Google Sheet
+
+    // Inizio funzione di esportazione CSV
+    function exportCSV() {
+      const movimenti = JSON.parse(localStorage.getItem('movimenti') || '[]');
+      if (movimenti.length === 0) return;
+      const csvRows = ["Data,Importo,Categoria,Tipo,Note"];
+      movimenti.forEach(m => {
+        const row = `${m.data},${m.importo},${m.categoria},${m.tipo},"${m.note.replace(/"/g, '""')}"`;
+        csvRows.push(row);
+      });
+      const csvContent = csvRows.join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", "movimenti.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    // Fine funzione di esportazione CSV
+
+    // Inizio funzione di caricamento da Google Sheet
+    function caricaDaGoogle() {
+  const formatDate = (input) => {
+    const d = new Date(input);
+    return isNaN(d) ? input : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  };
+      const storicoBox = document.getElementById('storico');
+      const logBox = document.getElementById('log');
+      const sheetUrl = 'https://script.google.com/macros/s/AKfycbx-88D_E0_ZZszE3nAwFAcOtBC9lV0Bwap1MSTp1FIzTn_do7LJKlXzlsSLEv1LNO1P/exec';
+      fetch(sheetUrl)
+        .then(response => {
+          if (!response.ok) throw new Error('Errore HTTP: ' + response.status);
+          return response.text();
+        })
+        .then(csvText => {
+          const righe = csvText.trim().split('\n').slice(1); // salta intestazione
+          if (righe.length === 0) {
+            storicoBox.innerHTML = '<p>Nessun movimento trovato nel foglio.</p>';
+            return;
+          }
+          let html = '<table><tr><th>Data</th><th>Importo</th><th>Categoria</th><th>Tipo</th><th>Note</th></tr>';
+          righe.forEach(riga => {
+            const [data, importo, categoria, tipo, note] = riga.split(',').map(cell => cell.replace(/"/g, ''));
+            html += `<tr><td>${formatDate(data)}</td><td>€${importo}</td><td>${categoria}</td><td>${tipo}</td><td>${note}</td></tr>`;
+          });
+          html += '</table>';
+          storicoBox.innerHTML = html;
+          storicoBox.style.display = 'block';
+          logBox.innerText = 'Movimenti caricati da Google Sheet.';
+        })
+        .catch(err => {
+          storicoBox.innerHTML = '<p>Errore durante il caricamento.</p>';
+          logBox.innerText = 'Errore: ' + err.message;
+        });
+    }
+    // Fine funzione di caricamento da Google Sheet
+  </script>
+  <!-- Fine script JavaScript -->
+</body>
 </html>
