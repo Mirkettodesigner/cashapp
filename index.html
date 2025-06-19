@@ -5,198 +5,891 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cash Tracker</title>
   <style>
-    /* Stili generali */
-    body { font-family: sans-serif; margin: 0; background: #111; color: #fff; }
-    .container { display: flex; height: 100vh; }
-    .left, .right { padding: 1rem; }
-    .left { width: 30%; background: #1e1e1e; display: flex; flex-direction: column; justify-content: start; gap: 0.5rem; }
-    .right { width: 70%; display: flex; flex-direction: column; justify-content: start; }
+    /* Reset e stili globali */
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; margin: 0; background: #111; color: #fff; overflow: hidden; } /* Rimuovi scroll di default */
     
-    /* Stili per le categorie */
-    .categories { display: flex; flex-direction: column; gap: 0.5rem; }
-    .category { padding: 1rem; background: #333; border: none; cursor: pointer; border-radius: 4px; text-align: center; font-size: 1.2rem; }
-    .category.active { background: #555; }
+    /* Layout principale del contenitore */
+    .container { 
+      display: flex; 
+      height: 100vh; /* Forza l'altezza al 100% del viewport */
+      flex-direction: row; 
+      overflow: hidden; /* Nascondi qualsiasi overflow che potrebbe crearsi all'interno */
+    } 
     
-    /* Stili per la tastiera */
-    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 1rem 0; }
-    .keypad input { grid-column: span 3; font-size: 2rem; text-align: right; padding: 0.5rem; background: #000; border: none; color: #fff; width: 100%; }
-    .key { padding: 1rem; background: #222; border: none; cursor: pointer; font-size: 1.5rem; border-radius: 4px; }
+    /* Stili per le colonne sinistra, centro e destra */
+    .left, .center, .right {
+      background: #1e1e1e; /* Colore di sfondo scuro per i pannelli laterali */
+      display: flex;
+      flex-direction: column;
+    }
     
-    /* Stili per le azioni */
-    .actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-    .actions button, .export { flex: 1; padding: 0.75rem 1rem; font-size: 1.1rem; border-radius: 4px; border: none; cursor: pointer; }
-    .cash { background: green; color: white; }
-    .pos { background: blue; color: white; }
-    .uscite { background: red; color: white; }
+    .left {
+      width: 240px; /* Larghezza fissa per il pannello categorie su desktop */
+      justify-content: flex-start; /* Allinea le categorie in alto */
+      flex-shrink: 0; /* Previene che si restringa su desktop */
+      overflow-y: auto; /* Permetti lo scroll solo se le categorie superano l'altezza */
+    }
     
-    /* Stili per lo storico */
-    #storico { margin-top: 1rem; overflow-y: auto; max-height: 200px; background: #222; padding: 0.5rem; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 0.3rem; text-align: left; border-bottom: 1px solid #444; font-size: 0.85rem; }
+    .center {
+      flex-grow: 1; /* Il pannello centrale occupa lo spazio rimanente */
+      background: #181818; /* Sfondo leggermente più scuro per l'area di input */
+      padding: 1rem; /* Padding per il contenuto centrale */
+      display: flex; /* Rende il centro un contenitore flex */
+      flex-direction: column; /* Impila gli elementi verticalmente */
+      overflow-y: hidden; /* Importante: nasconde lo scroll nel centro per non farlo apparire sul body */
+    }
     
-    /* Stili per il log */
-    #log { margin-top: 1rem; font-size: 0.9rem; color: #ccc; font-style: italic; }
+    .right {
+      width: 200px; /* Larghezza fissa per il pannello dei pulsanti di azione su desktop */
+      justify-content: center; /* Centra i pulsanti verticalmente */
+      align-items: stretch; /* Estende i pulsanti per riempire la larghezza */
+      gap: 1.5rem; /* Spazio tra i pulsanti */
+      padding: 1rem; /* Padding per il pannello destro */
+      flex-shrink: 0; /* Previene che si restringa su desktop */
+      overflow-y: auto; /* Permetti lo scroll solo se i pulsanti superano l'altezza */
+    }
+    
+    /* Stili per le categorie nel pannello sinistro */
+    .categories {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      gap: 0.5rem; /* Spazio tra i bottoni categoria */
+      padding: 1rem;
+      height: 100%; /* Permette alle categorie di riempire l'altezza disponibile */
+    }
+    
+    .category {
+      flex: 1; /* Le categorie si espandono per riempire lo spazio */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 1rem;
+      background: #333; /* Sfondo scuro per il bottone categoria */
+      border: none;
+      cursor: pointer;
+      border-radius: 4px; /* Bordi arrotondati */
+      text-align: center;
+      font-size: 1.2rem;
+      color: white; /* Testo bianco */
+      transition: background 0.3s ease; /* Transizione per l'hover/active */
+    }
+    
+    .category:hover {
+        background: #444; /* Colore più chiaro all'hover */
+    }
+
+    .category.active {
+        background: #555; /* Colore diverso per la categoria attiva */
+        border: 2px solid #66bb6a; /* Bordo verde per la categoria attiva */
+    }
+    
+    /* Stili per l'area dei messaggi in alto (solo risultato) */
+    .top-messages-area {
+      margin-bottom: 1rem; /* Spazio tra i messaggi e l'area di input */
+      flex-shrink: 0; /* Evita che questa area si restringa */
+    }
+
+    /* Stili per l'area di input e tastierino in basso */
+    .bottom-input-area {
+      margin-top: auto; /* Spinge questa area e il suo contenuto in fondo al contenitore .center */
+      width: 100%; /* Assicura che l'area prenda tutta la larghezza disponibile */
+      display: flex;
+      flex-direction: column;
+      gap: 1rem; /* Spazio tra gli elementi: tastierino, log, note */
+      flex-grow: 1; /* Permette a quest'area di occupare spazio flessibile */
+      min-height: 0; /* Consente all'elemento di restringersi sotto la dimensione intrinseca */
+    }
+
+    /* Stili per il tastierino numerico principale */
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr); /* 3 colonne uguali */
+      gap: 0.5rem; /* Spazio tra i tasti */
+      width: 100%;
+      flex-grow: 2; /* Dà al tastierino più spazio per crescere */
+      min-height: 0; /* Consente all'elemento di restringersi sotto la dimensione intrinseca */
+    }
+    
+    .keypad input {
+      grid-column: span 3; /* L'input si estende per 3 colonne */
+      font-size: 6rem;
+      text-align: right;
+      padding: 0.5rem;
+      background: #000; /* Sfondo nero per l'input */
+      border: none;
+      color: #fff; /* Testo bianco */
+      width: 100%;
+      min-height: 4rem; /* Altezza minima adeguata per desktop */
+      height: auto; /* Permette all'altezza di adattarsi */
+      border-radius: 4px; /* Bordi arrotondati */
+      display: flex; /* Utilizza flex per centrare verticalmente il contenuto */
+      align-items: center;
+      justify-content: flex-end;
+    }
+    
+    .key {
+      min-height: 80px; /* Altezza minima per desktop */
+      height: auto; /* Permette all'altezza di adattarsi */
+      background: #222; /* Sfondo scuro per i tasti */
+      border: none;
+      cursor: pointer;
+      font-size: 1.8rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      transition: background 0.3s ease; /* Transizione per l'hover */
+    }
+
+    .key:hover {
+        background: #3a3a3a; /* Colore più chiaro all'hover */
+    }
+    
+    #clear {
+        background: #e74c3c; /* Colore rosso per il tasto Clear */
+    }
+    #clear:hover {
+        background: #c0392b;
+    }
+
+    /* Stili per i pulsanti di registrazione (CASH, POS, USCITE) */
+    .right button {
+      flex: 1; /* Si espandono per riempire lo spazio disponibile */
+      padding: 2rem;
+      font-size: 1.5rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px; /* Bordi arrotondati */
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 90px; /* Altezza minima leggermente ridotta */
+      transition: background 0.3s ease, transform 0.2s ease; /* Transizioni */
+    }
+
+    .right button:hover {
+        transform: translateY(-2px); /* Leggero sollevamento all'hover */
+    }
+    
+    .cash { background: #2ecc71; } /* Verde per CASH */
+    .cash:hover { background: #27ae60; }
+    
+    .pos { background: #3498db; } /* Blu per POS */
+    .pos:hover { background: #2980b9; }
+    
+    .uscite { background: #e74c3c; } /* Rosso per USCITE */
+    .uscite:hover { background: #c0392b; }
+
+    /* Nuovo stile per il pulsante Visualizza Storico */
+    .history-button {
+      background: #ffc107; /* Giallo */
+      color: #000; /* Testo nero */
+      font-size: 1.0rem; /* Mantenuto o leggermente adattato per l'icona */
+      padding: 0.3rem; /* Padding ridotto per supportare la riduzione dell'altezza */
+      border-radius: 8px;
+      line-height: 1; /* Assicura che l'altezza sia determinata principalmente da flex */
+      min-height: 40px; /* Altezza minima per il pulsante storico su desktop */
+      flex-shrink: 0; /* Previene che si restringa troppo */
+    }
+    .history-button:hover {
+        background: #e0a800; /* Giallo più scuro all'hover */
+    }
+    
+    /* Stili per l'area delle note */
+    #note {
+      width: 100%;
+      padding: 0.5rem;
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+      resize: vertical; /* Permette il ridimensionamento verticale */
+      min-height: 40px; /* Altezza minima per l'area delle note */
+      flex-grow: 1; /* Permette all'area delle note di crescere/restringersi */
+    }
+    
+    /* Stili per i messaggi di risultato */
+    #result {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #333;
+      border-radius: 4px;
+      color: #90ee90; /* Verde chiaro per i messaggi di successo */
+      text-align: center;
+      flex-shrink: 0; /* Evita che questa area si restringa */
+    }
+
+    /* Stili per il log di sincronizzazione */
+    #log {
+      margin-top: 0.5rem; /* Spazio sopra il log ridotto */
+      margin-bottom: 0.5rem; /* Spazio sotto il log */
+      padding: 0.5rem;
+      font-size: 0.9rem;
+      color: #ccc;
+      font-style: italic;
+      text-align: center;
+      background: #333; /* Sfondo leggermente scuro per il log */
+      border-radius: 4px;
+      flex-shrink: 0; /* Evita che questa area si restringa */
+    }
+    
+    /* Stili per la modal dello storico */
+    #popup-overlay {
+      display:none;
+      position:fixed;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      background:rgba(0,0,0,0.6); /* Sfondo semi-trasparente */
+      z-index:9998; /* Assicura che sia sotto la modal ma sopra il resto */
+    }
+    
+    #storico-modal {
+      display:none;
+      position:fixed;
+      top:5%;
+      left:50%;
+      transform:translateX(-50%); /* Centra la modal orizzontalmente */
+      width:80%;
+      height:80%;
+      background:#1e1e1e; /* Sfondo scuro per la modal */
+      color:white;
+      overflow:auto; /* Aggiunge scroll se il contenuto è troppo grande */
+      padding:1rem;
+      border-radius:8px;
+      z-index:9999; /* Assicura che sia sopra l'overlay */
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5); /* Ombra più pronunciata */
+    }
+    
+    #storico-modal button {
+      position:absolute;
+      top:1rem;
+      right:1rem;
+      font-size:1.2rem;
+      background:#e74c3c; /* Rosso per il pulsante Chiudi */
+      color:white;
+      border:none;
+      padding:0.5rem 1rem;
+      cursor:pointer;
+      border-radius: 4px;
+      transition: background 0.3s ease;
+    }
+    #storico-modal button:hover {
+        background: #c0392b;
+    }
+    
+    #storico-popup-content {
+      margin-top: 3rem; /* Spazio per il pulsante chiudi */
+    }
+    
+    #storico-popup-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    
+    #storico-popup-content th, #storico-popup-content td {
+      padding: 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid #444; /* Linea divisoria sottile */
+      font-size: 0.9rem;
+    }
+    
+    #storico-popup-content th {
+      background: #333; /* Sfondo per le intestazioni della tabella */
+      font-weight: bold;
+    }
+
+    /* Stili per la schermata di blocco PIN */
+    #pin-lock-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95); /* Sfondo scuro quasi opaco */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000; /* Assicura che sia sopra tutto */
+        color: white;
+    }
+
+    #pin-display-container {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .pin-digit {
+        width: 40px;
+        height: 50px;
+        background: #222;
+        border: 2px solid #555;
+        border-radius: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2em;
+        font-weight: bold;
+        color: #fff;
+    }
+
+    /* Stile per nascondere i caratteri del PIN */
+    .pin-digit.hidden-char::before {
+        content: '•'; /* Punto per carattere nascosto */
+    }
+
+    #pin-keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        width: 300px; /* Larghezza fissa per il tastierino PIN */
+        max-width: 90%; /* Per responsività su schermi più piccoli */
+    }
+
+    #pin-keypad .key {
+      height: 80px; /* Altezza dei tasti PIN */
+      font-size: 2.2rem;
+      background: #333;
+      border: 1px solid #555;
+      color: white;
+      transition: background 0.3s ease;
+    }
+    #pin-keypad .key:hover {
+        background: #555;
+    }
+
+    #pin-clear-button {
+        background: #e74c3c;
+    }
+    #pin-clear-button:hover {
+        background: #c0392b;
+    }
+
+    #pin-enter-button {
+        background: #2ecc71; /* Già verde */
+    }
+    #pin-enter-button:hover {
+        background: #27ae60;
+    }
+
+    #pin-message {
+        margin-top: 20px;
+        color: #ff6347; /* Colore per i messaggi di errore PIN */
+        font-size: 1.1em;
+        text-align: center;
+    }
+
+    /* Media Queries per tablet e schermi più piccoli (verticale) */
+    @media (max-width: 1024px) {
+        .left, .right {
+            width: 150px; /* Ridotto per lasciare più spazio al centro */
+            padding: 0.8rem;
+        }
+        .right button {
+            padding: 0.8rem; /* Riduci il padding sui bottoni principali */
+            font-size: 1.1rem;
+            min-height: 50px; /* Riduci l'altezza minima */
+        }
+        .history-button {
+            min-height: 35px;
+            font-size: 1rem;
+            padding: 0.2rem 0.4rem;
+        }
+        .keypad input {
+            font-size: 3rem; /* Dimensione del font per l'input */
+            min-height: 4.5rem; /* Altezza minima adeguata */
+        }
+        .key {
+            min-height: 60px; /* Regola l'altezza minima per i tasti */
+            font-size: 1.3rem; /* Regola la dimensione del font per i tasti */
+        }
+        #note {
+            min-height: 30px; /* Ulteriore riduzione dell'altezza minima per l'area delle note */
+        }
+    }
+
+    @media (max-width: 768px) { /* Tablet orizzontale o smartphone verticale */
+        .container {
+            flex-direction: column; /* Impila le colonne verticalmente su tablet */
+            height: 100vh; /* Mantieni altezza 100vh anche in verticale */
+            overflow-y: auto; /* Permetti lo scroll se il contenuto supera l'altezza */
+        }
+        body {
+            overflow: auto; /* Permetti lo scroll sul body */
+        }
+        .left, .right {
+            width: 100%; /* I pannelli laterali prendono tutta la larghezza */
+            height: auto; /* Altezza automatica */
+            flex-shrink: 1; /* Permetti che si restringano */
+            padding: 0.5rem;
+        }
+        .categories {
+            flex-direction: row; /* Le categorie possono andare in fila su tablet */
+            flex-wrap: wrap; /* Avvolgi le categorie se non c'è spazio */
+            justify-content: center;
+            gap: 0.3rem; /* Riduci lo spazio tra i bottoni categoria */
+            padding: 0.5rem;
+            height: auto; /* Lascia che l'altezza si adatti */
+        }
+        .category {
+            flex: 1 1 auto; /* Permetti ai bottoni di crescere/restringersi e andare a capo */
+            min-width: 80px; /* Larghezza minima per evitare che diventino troppo piccoli */
+            padding: 0.6rem;
+            font-size: 0.9rem;
+        }
+        .center {
+            padding: 0.5rem; /* Riduci il padding al centro */
+            height: auto; /* Importante: lascia che l'altezza si adatti */
+            flex-grow: 1; /* Assicurati che il centro prenda lo spazio rimanente */
+            overflow-y: hidden; /* Nascondi overflow, affidati agli elementi interni */
+        }
+        .bottom-input-area {
+            gap: 0.5rem; /* Riduci spazio tra elementi */
+        }
+        .keypad input {
+            font-size: 2rem; /* Riduci la dimensione del font per l'input */
+            min-height: 3rem; /* Regola l'altezza minima */
+            padding: 0.2rem; /* Riduci il padding */
+        }
+        .key {
+            min-height: 50px; /* Regola l'altezza minima per i tasti */
+            font-size: 1rem; /* Regola la dimensione del font per i tasti */
+        }
+        .right {
+            flex-direction: row; /* I pulsanti di registrazione possono andare in fila */
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            height: auto; /* Altezza automatica */
+        }
+        .right button {
+            flex: 1 1 auto; /* Permetti ai bottoni di crescere/restringersi */
+            min-width: 90px; /* Larghezza minima per i bottoni */
+            font-size: 1rem;
+            padding: 0.6rem;
+            min-height: 50px;
+        }
+        .history-button {
+            flex: 0 0 auto; /* Impedisci al pulsante storico di crescere troppo */
+            width: auto;
+            padding: 0.2rem 0.5rem;
+            font-size: 1.2rem; /* Mantieni l'icona leggibile */
+            min-height: 35px;
+        }
+        #note {
+            min-height: 30px; /* Ulteriore riduzione dell'altezza minima per l'area delle note */
+            flex-grow: 1; /* Maggiore flessibilità se necessario */
+        }
+        #log {
+            font-size: 0.7rem;
+            margin-top: 0.3rem; /* Ulteriore riduzione margine */
+        }
+        #storico-modal {
+            width: 95%; /* La modal prende più larghezza su schermi piccoli */
+            top: 2%; /* Sposta leggermente più in alto */
+            height: 95%; /* Occupa più altezza */
+        }
+        #storico-popup-content th, #storico-popup-content td {
+            padding: 0.3rem; /* Riduci il padding nella tabella dello storico */
+            font-size: 0.75rem;
+        }
+    }
+
+    /* Media Queries per smartphone (ancora più piccoli) */
+    @media (max-width: 480px) {
+        .container {
+            padding: 0.1rem;
+        }
+        .left, .right, .center {
+            padding: 0.3rem;
+            gap: 0.3rem;
+        }
+        .keypad input {
+            font-size: 1.5rem; /* Dimensione del font ancora più piccola */
+            min-height: 2rem; /* Altezza minima ancora più piccola */
+            padding: 0.15rem;
+        }
+        .key {
+            min-height: 35px; /* Altezza minima ancora più piccola per i tasti */
+            font-size: 0.75rem; /* Dimensione del font ancora più piccola per i tasti */
+            padding: 0.1rem;
+        }
+        .right button {
+            font-size: 0.8rem;
+            padding: 0.5rem;
+            min-height: 40px;
+            gap: 0.3rem;
+        }
+        .history-button {
+            font-size: 0.9rem;
+            min-height: 30px;
+            padding: 0.15rem 0.3rem;
+        }
+        .pin-digit {
+            width: 20px;
+            height: 30px;
+            font-size: 1em;
+        }
+        #pin-keypad {
+            width: 180px;
+        }
+        #pin-keypad .key {
+            height: 40px;
+            font-size: 1.2rem;
+        }
+        #note {
+            min-height: 25px; /* Minore altezza per le note */
+        }
+        #log {
+            font-size: 0.65rem;
+        }
+    }
+
   </style>
 </head>
 <body>
-  <!-- Inizio contenitore principale -->
-  <div class="container">
-    <!-- Inizio sezione sinistra -->
+  <!-- Schermata di blocco PIN -->
+  <div id="pin-lock-screen">
+    <h2>Inserisci il PIN</h2>
+    <div id="pin-display-container">
+      <div class="pin-digit" id="pin-digit-0"></div>
+      <div class="pin-digit" id="pin-digit-1"></div>
+      <div class="pin-digit" id="pin-digit-2"></div>
+      <div class="pin-digit" id="pin-digit-3"></div>
+    </div>
+    <div id="pin-keypad">
+      <div class="key" data-pin-value="1">1</div>
+      <div class="key" data-pin-value="2">2</div>
+      <div class="key" data-pin-value="3">3</div>
+      <div class="key" data-pin-value="4">4</div>
+      <div class="key" data-pin-value="5">5</div>
+      <div class="key" data-pin-value="6">6</div>
+      <div class="key" data-pin-value="7">7</div>
+      <div class="key" data-pin-value="8">8</div>
+      <div class="key" data-pin-value="9">9</div>
+      <!-- Modificato l'ordine per posizionare Enter sotto il 9 -->
+      <div class="key" id="pin-clear-button">C</div>
+      <div class="key" data-pin-value="0">0</div>
+      <div class="key" id="pin-enter-button">✔</div>
+    </div>
+    <div id="pin-message"></div>
+  </div>
+
+  <!-- Contenitore principale dell'applicazione (inizialmente nascosto) -->
+  <div class="container" id="main-app-container" style="display:none;">
     <div class="left">
       <div class="categories" id="categories"></div>
     </div>
-    <!-- Fine sezione sinistra -->
-
-    <!-- Inizio sezione destra -->
-    <div class="right">
-      <!-- Inizio tastiera -->
-      <div class="keypad">
-        <input type="text" id="display" disabled />
-        <div class="key" data-value="1">1</div>
-        <div class="key" data-value="2">2</div>
-        <div class="key" data-value="3">3</div>
-        <div class="key" data-value="4">4</div>
-        <div class="key" data-value="5">5</div>
-        <div class="key" data-value="6">6</div>
-        <div class="key" data-value="7">7</div>
-        <div class="key" data-value="8">8</div>
-        <div class="key" data-value="9">9</div>
-        <div class="key" data-value=".">.</div>
-        <div class="key" data-value="0">0</div>
-        <div class="key" id="clear">C</div>
+    <div class="center">
+      <!-- Area per i messaggi di risultato in alto -->
+      <div class="top-messages-area">
+        <div id="result"></div>
       </div>
-      <!-- Fine tastiera -->
 
-      <!-- Inizio area note -->
-      <textarea id="note" placeholder="Note..." style="width:100%;padding:0.5rem;margin-bottom:1rem;"></textarea>
-      <!-- Fine area note -->
-
-      <!-- Inizio azioni -->
-      <div class="actions">
-        <button class="cash" onclick="register('CASH')">CASH</button>
-        <button class="pos" onclick="register('POS')">POS</button>
-        <button class="uscite" onclick="register('USCITE')">USCITE</button>
+      <!-- Area per l'input e il tastierino in basso -->
+      <div class="bottom-input-area">
+        <div class="keypad">
+          <input type="text" id="display" disabled />
+          <div class="key" data-value="7">7</div>
+          <div class="key" data-value="8">8</div>
+          <div class="key" data-value="9">9</div>
+          <div class="key" data-value="4">4</div>
+          <div class="key" data-value="5">5</div>
+          <div class="key" data-value="6">6</div>
+          <div class="key" data-value="1">1</div>
+          <div class="key" data-value="2">2</div>
+          <div class="key" data-value="3">3</div>
+          <div class="key" id="clear">C</div>
+          <div class="key" data-value="0">0</div>
+          <div class="key" data-value=".">.</div>
+        </div>
+        <!-- Barra del report di invio file spostata qui -->
+        <div id="log"></div>
+        <textarea id="note" placeholder="Note..."></textarea>
       </div>
-      <!-- Fine azioni -->
-
-      <!-- Inizio pulsanti di esporta e sincronizzazione -->
-<div style="display: flex; gap: 1rem;">
-  <button class="export" onclick="exportCSV()">📁 Esporta CSV</button>
-  <button class="export" onclick="caricaDaGoogle()">📥 Carica da Google</button>
-</div>
-<!-- Fine pulsanti di esporta e sincronizzazione -->
-
-      <!-- Inizio risultato -->
-      <div id="result"></div>
-      <!-- Fine risultato -->
-
-      <!-- Inizio log -->
-      <div id="log"></div>
-      <!-- Fine log -->
-
-      <!-- Inizio storico -->
-      <div id="storico"></div>
-      <!-- Fine storico -->
     </div>
-    <!-- Fine sezione destra -->
+    <div class="right">
+      <button class="cash" onclick="register('CASH')">CASH</button>
+      <button class="pos" onclick="register('POS')">POS</button>
+      <button class="uscite" onclick="register('USCITE')">USCITE</button>
+      <!-- Pulsante "Visualizza Storico" modificato per avere solo l'icona -->
+      <button class="history-button" onclick="caricaDaGoogle()">📖</button>
+    </div>
   </div>
-  <!-- Fine contenitore principale -->
+  
+  <!-- Overlay e Modal per lo Storico -->
+  <div id="popup-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9998;"></div>
+  <div id="storico-modal" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); width:80%; height:80%; background:#1e1e1e; color:white; overflow:auto; padding:1rem; border-radius:8px; z-index:9999;">
+    <button onclick="chiudiPopup()" style="position:absolute; top:1rem; right:1rem; font-size:1.2rem; background:#e74c3c; color:white; border:none; padding:0.5rem 1rem; cursor:pointer;">Chiudi</button>
+    <div id="storico-popup-content"></div>
+  </div>
+  
+<script>
+  // Funzione per chiudere la modal dello storico
+  function chiudiPopup() {
+    document.getElementById('popup-overlay').style.display = 'none';
+    document.getElementById('storico-modal').style.display = 'none';
+  }
 
-  <!-- Inizio script JavaScript -->
-  <script>
-    // Inizio inizializzazione delle categorie
-try {
-  const categorie = ['GRAFICA', 'FOTOLAB', 'PANNELLI', 'TIPOGRAFIA', 'LASER'];
-  const container = document.getElementById('categories');
-  categorie.forEach(cat => {
-    const btn = document.createElement('button');
-    btn.textContent = cat;
-    btn.className = 'category';
-    btn.onclick = () => {
-      document.querySelectorAll('.category').forEach(el => el.classList.remove('active'));
-      btn.classList.add('active');
-    };
-    container.appendChild(btn);
+  // Costanti per l'autenticazione PIN
+  const CORRECT_PIN = "1093"; // PIN aggiornato a 1093
+  let currentPinInput = "";
+  const pinDisplayDigits = [
+    document.getElementById("pin-digit-0"),
+    document.getElementById("pin-digit-1"),
+    document.getElementById("pin-digit-2"),
+    document.getElementById("pin-digit-3"),
+  ];
+  const pinMessage = document.getElementById("pin-message");
+  const pinLockScreen = document.getElementById("pin-lock-screen");
+  const mainAppContainer = document.getElementById("main-app-container");
+
+  // Funzione per aggiornare il display del PIN
+  function updatePinDisplay() {
+    for (let i = 0; i < 4; i++) {
+      if (i < currentPinInput.length) {
+        pinDisplayDigits[i].classList.add("hidden-char"); // Mostra il punto
+      } else {
+        pinDisplayDigits[i].classList.remove("hidden-char"); // Nasconde il punto
+      }
+    }
+    pinMessage.textContent = ""; // Resetta il messaggio di errore
+  }
+
+  // Gestore eventi per il tastierino PIN
+  document.getElementById("pin-keypad").addEventListener("click", (event) => {
+    const target = event.target;
+    if (target.classList.contains("key")) {
+      const value = target.getAttribute("data-pin-value");
+
+      if (value !== null) { // Tasti numerici (1-9, 0)
+        if (currentPinInput.length < 4) {
+          currentPinInput += value;
+          updatePinDisplay();
+        }
+      } else if (target.id === "pin-clear-button") { // Tasto Clear (C)
+        currentPinInput = "";
+        updatePinDisplay();
+      } else if (target.id === "pin-enter-button") { // Tasto Enter (✔)
+        if (currentPinInput === CORRECT_PIN) {
+          pinLockScreen.style.display = "none"; // Nasconde la schermata di blocco
+          mainAppContainer.style.display = "flex"; // Mostra l'applicazione principale
+        } else {
+          pinMessage.textContent = "PIN errato. Riprova.";
+          currentPinInput = ""; // Resetta l'input dopo un errore
+          updatePinDisplay();
+        }
+      }
+    }
   });
-} catch (err) {
-  document.getElementById('log').innerText = 'Errore categorie: ' + err.message;
-}
-// Fine inizializzazione delle categorie
 
-    // Inizio gestione della tastiera
-    let currentInput = '';
-    document.querySelectorAll('.key').forEach(key => {
+  // Assicurati che la schermata di blocco sia visibile all'inizio
+  updatePinDisplay(); // Inizializza il display
+  pinLockScreen.style.display = "flex"; // Mostra la schermata di blocco all'avvio
+
+  // Esegue il codice quando il DOM è completamente caricato
+  document.addEventListener("DOMContentLoaded", function () {
+    // Definisce le categorie disponibili
+    const categorie = [
+      'FOTOLAB', 
+      'PHOTOSI', 
+      'GRAFICA', 
+      'PANNELLI', 
+      'TIPOGRAFIA', 
+      'LASER', 
+      'MAGLIETTE', 
+      'CUSTOM'    
+    ];
+    const container = document.getElementById('categories'); // Ottiene il contenitore delle categorie
+    
+    // Genera i pulsanti per ogni categoria
+    categorie.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.textContent = cat;
+      btn.className = 'category';
+      btn.onclick = () => {
+        // Rimuove la classe 'active' da tutti i pulsanti categoria
+        document.querySelectorAll('.category').forEach(el => el.classList.remove('active'));
+        // Aggiunge la classe 'active' al pulsante cliccato
+        btn.classList.add('active');
+      };
+      container.appendChild(btn); // Aggiunge il pulsante al contenitore
+    });
+
+    let currentInput = ''; // Variabile per memorizzare l'input corrente del tastierino
+    const display = document.getElementById('display'); // Ottiene il riferimento all'input del display
+
+    // Aggiunge event listener ai tasti del tastierino
+    document.querySelectorAll('.keypad .key').forEach(key => { // Target specifico per il tastierino principale
       key.addEventListener('click', () => {
-        const value = key.getAttribute('data-value');
+        const value = key.getAttribute('data-value'); // Ottiene il valore associato al tasto
         if (value) {
+          // Se è un valore numerico o il punto, aggiungi all'input corrente
           currentInput += value;
-          document.getElementById('display').value = currentInput;
+          display.value = currentInput;
         } else if (key.id === 'clear') {
+          // Se è il tasto Clear, resetta l'input
           currentInput = '';
-          document.getElementById('display').value = '';
+          display.value = '';
         }
       });
     });
-    // Fine gestione della tastiera
 
-    // Inizio funzione di registrazione
-    function register(type) {
-      const amount = parseFloat(currentInput);
-      const note = document.getElementById('note').value;
-      const resultBox = document.getElementById('result');
-      const categoryBtn = document.querySelector('.category.active');
-
+    // Funzione per registrare un movimento (CASH, POS, USCITE)
+    window.register = function(type) {
+      const amount = parseFloat(currentInput); // Converte l'input in numero
+      const note = document.getElementById('note').value.trim(); // Ottiene il testo delle note e rimuove spazi bianchi
+      const resultBox = document.getElementById('result'); // Riferimento alla casella dei risultati
+      const categoryBtn = document.querySelector('.category.active'); // Ottiene la categoria attiva
+      const logBox = document.getElementById('log'); // Riferimento alla casella di log
+      
+      // Validazione: controlla se una categoria è stata selezionata
       if (!categoryBtn) {
         resultBox.innerText = 'Errore: Seleziona una categoria.';
+        resultBox.style.color = '#ff6347'; // Rosso per errore
         return;
       }
-
       const category = categoryBtn.textContent;
-
-      if (isNaN(amount)) {
-        resultBox.innerText = 'Errore: Inserire un importo valido.';
+      
+      // Validazione specifica per la categoria 'CUSTOM'
+      if (category === 'CUSTOM' && note === '') { // Aggiornato il controllo della categoria
+        resultBox.innerText = 'Errore: Devi inserire una nota per la categoria CUSTOM.';
+        resultBox.style.color = '#ff6347'; // Rosso per errore
         return;
       }
 
+      // Validazione: controlla se l'importo è un numero valido
+      if (isNaN(amount) || currentInput === '') {
+        resultBox.innerText = 'Errore: Inserire un importo valido.';
+        resultBox.style.color = '#ff6347'; // Rosso per errore
+        return;
+      }
+
+      // Prepara i dati del movimento
       const now = new Date();
       const data = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth()+1).toString().padStart(2, '0')}/${now.getFullYear()}`;
       const movimento = {
         data,
-        importo: parseFloat(amount).toFixed(2),
+        importo: type === 'USCITE' ? (-Math.abs(amount)).toFixed(2) : amount.toFixed(2), // Importo negativo per le uscite
         categoria: category,
         note,
         tipo: type,
-        sync: false
+        sync: false // Flag per la sincronizzazione con Google Sheet
       };
-
+      
+      // Carica i movimenti esistenti da localStorage e aggiunge il nuovo
       const storico = JSON.parse(localStorage.getItem('movimenti') || '[]');
       storico.push(movimento);
-      localStorage.setItem('movimenti', JSON.stringify(storico));
+      localStorage.setItem('movimenti', JSON.stringify(storico)); // Salva nel localStorage
 
+      // Resetta l'interfaccia utente
       currentInput = '';
-      document.getElementById('display').value = '';
+      display.value = '';
       document.getElementById('note').value = '';
-      document.querySelectorAll('.category').forEach(el => el.classList.remove('active'));
-
+      document.querySelectorAll('.category').forEach(el => el.classList.remove('active')); // Deseleziona la categoria
+      
+      // Mostra il messaggio di successo
       resultBox.innerText = `Registrato: €${movimento.importo} - ${type} - ${category}`;
+      resultBox.style.color = '#90ee90'; // Verde chiaro per successo
+      
+      // Inizializza il log prima della sincronizzazione
+      logBox.innerText = 'Avvio sincronizzazione...';
 
-      // Nuova riga: sincronizza subito
+      // Inizia la sincronizzazione con Google Sheet
       syncConSheet();
     }
-    // Fine funzione di registrazione
 
-    // Inizio funzione di sincronizzazione con Google Sheet
+    // Funzione per caricare i dati da Google Sheet e visualizzarli nella modal
+    window.caricaDaGoogle = function () {
+      const formatDate = (input) => {
+        const d = new Date(input);
+        // Controlla se la data è valida per evitare "Invalid Date"
+        return isNaN(d.getTime()) ? input : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      };
+      const storicoBox = document.getElementById('storico-popup-content');
+      document.getElementById('popup-overlay').style.display = 'block'; // Mostra l'overlay
+      document.getElementById('storico-modal').style.display = 'block'; // Mostra la modal
+      const logBox = document.getElementById('log'); // Assicurati di riferirti al log corretto
+      
+      // URL dello script Google Apps per interfacciarsi con Google Sheet
+      const sheetUrl = 'https://script.google.com/macros/s/AKfycbx3RcApbbBIpRhd19SLs33Vrt2lJYBZlH5fN6sdaPKDeuGrQZ4FYlKI8kDpUI8ujPGn/exec';
+      
+      logBox.innerText = 'Caricamento movimenti da Google Sheet...';
+      storicoBox.innerHTML = '<p>Caricamento in corso...</p>';
+
+      fetch(sheetUrl)
+        .then(response => {
+          if (!response.ok) throw new Error('Errore HTTP: ' + response.status);
+          return response.text(); // Legge la risposta come testo (CSV)
+        })
+        .then(csvText => {
+          // Processa il CSV: rimuove spazi e divide per riga, ignorando l'intestazione
+          let righe = csvText.trim().split(/\r?\n/).slice(1);
+          
+          if (righe.length === 0 || righe[0].trim() === '') { // Controlla anche righe vuote
+            storicoBox.innerHTML = '<p>Nessun movimento trovato nel foglio.</p>';
+            logBox.innerText = 'Nessun movimento trovato.';
+            return;
+          }
+
+          // Ordina le righe in base alla data, dal più recente al meno recente
+          // Assumiamo che la data sia nel formato MM/DD/YYYY o 
+          // Per un ordinamento corretto, convertiamo le date in oggetti Date per il confronto
+          righe.sort((a, b) => {
+            const dateA = new Date(a.split(',')[0].replace(/"/g, '').trim().split('/').reverse().join('-'));
+            const dateB = new Date(b.split(',')[0].replace(/"/g, '').trim().split('/').reverse().join('-'));
+            return dateB - dateA; // Dal più recente al meno recente
+          });
+          
+          let html = '<table><tr><th>Data</th><th>Importo</th><th>Categoria</th><th>Tipo</th><th>Note</th></tr>';
+          righe.forEach(riga => {
+            // Divide la riga CSV in colonne, rimuovendo le virgolette
+            const [data, importo, categoria, tipo, note] = riga.split(',').map(cell => cell.replace(/"/g, '').trim());
+            html += `<tr><td>${formatDate(data)}</td><td>€${importo}</td><td>${categoria}</td><td>${tipo}</td><td>${note}</td></tr>`;
+          });
+          html += '</table>';
+          storicoBox.innerHTML = html; // Inserisce la tabella HTML nella modal
+          logBox.innerText = 'Movimenti caricati da Google Sheet.';
+        })
+        .catch(err => {
+          // Gestione degli errori durante il fetch
+          storicoBox.innerHTML = '<p style="color: #ff6347;">Errore durante il caricamento dello storico.</p>';
+          logBox.innerText = 'Errore: ' + err.message;
+        });
+    }
+
+    // Funzione per sincronizzare i movimenti non sincronizzati con Google Sheet
     function syncConSheet() {
-      const sheetUrl = 'https://script.google.com/macros/s/AKfycbx-88D_E0_ZZszE3nAwFAcOtBC9lV0Bwap1MSTp1FIzTn_do7LJKlXzlsSLEv1LNO1P/exec';
+      const sheetUrl = 'https://script.google.com/macros/s/AKfycbx3RcApbbBIpRhd19SLs33Vrt2lJYBZlH5fN6sdaPKDeuGrQZ4FYlKI8kDpUI8ujPGn/exec';
       const movimenti = JSON.parse(localStorage.getItem('movimenti') || '[]');
-      const daSincronizzare = movimenti.filter(m => !m.sync);
+      const daSincronizzare = movimenti.filter(m => !m.sync); // Filtra i movimenti non ancora sincronizzati
       const logBox = document.getElementById('log');
+      const resultBox = document.getElementById('result');
+
       if (daSincronizzare.length === 0) {
-        document.getElementById('result').innerText = 'Nessun movimento da sincronizzare.';
+        resultBox.innerText = 'Nessun movimento da sincronizzare.';
+        resultBox.style.color = '#90ee90';
         logBox.innerText = '';
         return;
       }
-      let count = 0;
+      
+      logBox.innerText = `Sincronizzazione di ${daSincronizzare.length} movimento/i...`;
+      let count = 0; // Contatore dei movimenti sincronizzati
+      let errors = 0; // Contatore degli errori di sincronizzazione
+
       daSincronizzare.forEach((m, i) => {
         const formData = new FormData();
         formData.append("data", m.data);
@@ -204,84 +897,43 @@ try {
         formData.append("categoria", m.categoria);
         formData.append("tipo", m.tipo);
         formData.append("note", m.note);
+
         fetch(sheetUrl, {
           method: 'POST',
           body: formData
         }).then(resp => {
-          if (!resp.ok) throw new Error('HTTP error ' + resp.status);
-          m.sync = true;
+          if (!resp.ok) {
+            // Se la risposta non è OK (es. status 404, 500), lancia un errore
+            throw new Error('HTTP error ' + resp.status);
+          }
+          return resp.text(); // Leggi la risposta per debug, se necessario
+        }).then(() => {
+          m.sync = true; // Imposta il flag di sincronizzazione a true
           count++;
-          if (count === daSincronizzare.length) {
-            localStorage.setItem('movimenti', JSON.stringify(movimenti));
-            document.getElementById('result').innerText = `${count} movimento/i sincronizzato/i con Google Sheet.`;
-            logBox.innerText = 'Tutti i movimenti sono stati sincronizzati con successo.';
-          }
         }).catch((err) => {
-          document.getElementById('result').innerText = 'Errore di sincronizzazione.';
-          logBox.innerText = `Errore: ${err.message}`;
-        });
-      });
-    }
-    // Fine funzione di sincronizzazione con Google Sheet
-
-    // Inizio funzione di esportazione CSV
-    function exportCSV() {
-      const movimenti = JSON.parse(localStorage.getItem('movimenti') || '[]');
-      if (movimenti.length === 0) return;
-      const csvRows = ["Data,Importo,Categoria,Tipo,Note"];
-      movimenti.forEach(m => {
-        const row = `${m.data},${m.importo},${m.categoria},${m.tipo},"${m.note.replace(/"/g, '""')}"`;
-        csvRows.push(row);
-      });
-      const csvContent = csvRows.join("\n");
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", "movimenti.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-    // Fine funzione di esportazione CSV
-
-    // Inizio funzione di caricamento da Google Sheet
-    function caricaDaGoogle() {
-  const formatDate = (input) => {
-    const d = new Date(input);
-    return isNaN(d) ? input : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-  };
-      const storicoBox = document.getElementById('storico');
-      const logBox = document.getElementById('log');
-      const sheetUrl = 'https://script.google.com/macros/s/AKfycbx-88D_E0_ZZszE3nAwFAcOtBC9lV0Bwap1MSTp1FIzTn_do7LJKlXzlsSLEv1LNO1P/exec';
-      fetch(sheetUrl)
-        .then(response => {
-          if (!response.ok) throw new Error('Errore HTTP: ' + response.status);
-          return response.text();
-        })
-        .then(csvText => {
-          const righe = csvText.trim().split('\n').slice(1); // salta intestazione
-          if (righe.length === 0) {
-            storicoBox.innerHTML = '<p>Nessun movimento trovato nel foglio.</p>';
-            return;
+          errors++;
+          console.error("Errore durante la sincronizzazione:", err);
+          logBox.innerText = `Errore di sincronizzazione per alcuni movimenti: ${err.message}`;
+          resultBox.innerText = 'Errore di sincronizzazione.';
+          resultBox.style.color = '#ff6347';
+        }).finally(() => {
+          // Questo blocco viene eseguito dopo ogni fetch, sia in caso di successo che di errore
+          if (count + errors === daSincronizzare.length) {
+            // Se tutti i movimenti sono stati processati
+            localStorage.setItem('movimenti', JSON.stringify(movimenti)); // Aggiorna localStorage
+            if (errors === 0) {
+              resultBox.innerText = `${count} movimento/i sincronizzato/i con Google Sheet.`;
+              resultBox.style.color = '#90ee90';
+              logBox.innerText = 'Tutti i movimenti sono stati sincronizzati con successo.';
+            } else {
+              resultBox.innerText = `${count} movimento/i sincronizzato/i, ${errors} errori.`;
+              resultBox.style.color = '#ff6347';
+            }
           }
-          let html = '<table><tr><th>Data</th><th>Importo</th><th>Categoria</th><th>Tipo</th><th>Note</th></tr>';
-          righe.forEach(riga => {
-            const [data, importo, categoria, tipo, note] = riga.split(',').map(cell => cell.replace(/"/g, ''));
-            html += `<tr><td>${formatDate(data)}</td><td>€${importo}</td><td>${categoria}</td><td>${tipo}</td><td>${note}</td></tr>`;
-          });
-          html += '</table>';
-          storicoBox.innerHTML = html;
-          storicoBox.style.display = 'block';
-          logBox.innerText = 'Movimenti caricati da Google Sheet.';
-        })
-        .catch(err => {
-          storicoBox.innerHTML = '<p>Errore durante il caricamento.</p>';
-          logBox.innerText = 'Errore: ' + err.message;
         });
+      });
     }
-    // Fine funzione di caricamento da Google Sheet
-  </script>
-  <!-- Fine script JavaScript -->
+  });
+</script>
 </body>
 </html>
